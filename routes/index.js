@@ -6,7 +6,7 @@ router.get('/', (req, res) => {
   res.render('index', {
     nodes,
     roads,
-    title: 'Smart Flood Escape Route — Koramangala'
+    title: 'Smart Flood Escape Route — Kengeri'
   });
 });
 
