@@ -6,13 +6,15 @@ const https = require('https');
 const fs    = require('fs');
 const path  = require('path');
 
-// Bounding box: south, west, north, east — tight around Koramangala
+// Bounding box: south, west, north, east
+// Covers full Bangalore Urban: Nelamangala(W)→Hosakote(E), Hosur(S)→Nelamangala(N)
+// Only primary/secondary/tertiary roads with names to keep response manageable
 const query = `
-[out:json][timeout:30];
+[out:json][timeout:60];
 (
-  way["highway"~"primary|secondary|tertiary|residential|unclassified|service"]
+  way["highway"~"primary|secondary|tertiary"]
      ["name"]
-     (12.9250,77.6080,12.9450,77.6420);
+     (12.74,77.39,13.09,77.83);
 );
 out body;
 >;
@@ -32,7 +34,7 @@ const options = {
   }
 };
 
-console.log('Fetching Koramangala road data from OpenStreetMap...');
+console.log('Fetching full Bangalore Urban road data from OpenStreetMap...');
 
 const req = https.request(options, (res) => {
   let data = '';
