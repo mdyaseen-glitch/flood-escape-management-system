@@ -2,11 +2,12 @@ const https = require('https');
 const fs    = require('fs');
 const path  = require('path');
 
-// Kengeri bounding box: south=12.8900, west=77.4800, north=12.9200, east=77.5300
-const query = `[out:json][timeout:30];
+// Wider Kengeri bounding box to capture ALL roads
+// south=12.8700, west=77.4600, north=12.9300, east=77.5500
+const query = `[out:json][timeout:60];
 (
-  way["highway"~"primary|secondary|tertiary|residential|unclassified|service"]["name"]
-     (12.8900,77.4800,12.9200,77.5300);
+  way["highway"~"primary|secondary|tertiary|residential|unclassified|service|living_street|road|trunk"]
+     (12.8700,77.4600,12.9300,77.5500);
 );
 out body;
 >;
@@ -19,31 +20,39 @@ const options = {
   headers: {
     'Content-Type':   'application/x-www-form-urlencoded',
     'Content-Length': Buffer.byteLength(query),
-    'User-Agent':     'FloodNavApp/1.0 (educational)'
+    'User-Agent':     'FloodNavApp/1.0 (educational project)'
   }
 };
 
-console.log('Fetching Kengeri road data from OpenStreetMap...');
+console.log('Fetching ALL Kengeri roads from OpenStreetMap...');
+console.log('Bounding box: 12.87-12.93 N, 77.46-77.55 E');
 
 const req = https.request(options, (res) => {
   let data = '';
   res.on('data', c => { data += c; });
   res.on('end', () => {
     if (res.statusCode !== 200) {
-      console.error('HTTP Error:', res.statusCode);
+      console.error('HTTP Error:', res.statusCode, data.slice(0, 200));
       process.exit(1);
     }
     const out = path.join(__dirname, '..', 'osm_kengeri.json');
     fs.writeFileSync(out, data, 'utf8');
     const parsed = JSON.parse(data);
-    const ways  = parsed.elements.filter(e => e.type === 'way');
-    const nodes = parsed.elements.filter(e => e.type === 'node');
-    console.log('Done! Ways:', ways.length, '| Nodes:', nodes.length);
-    console.log('\nSample roads:');
-    ways.slice(0, 15).forEach(w => console.log(' -', w.tags.name, '[' + w.tags.highway + ']'));
+    const ways   = parsed.elements.filter(e => e.type === 'way');
+    const nodes  = parsed.elements.filter(e => e.type === 'node');
+    console.log('\n✅ Done!');
+    console.log('   Ways (roads):', ways.length);
+    console.log('   Nodes:       ', nodes.length);
+    console.log('\nRoad type breakdown:');
+    const types = {};
+    ways.forEach(w => { types[w.tags.highway] = (types[w.tags.highway]||0)+1; });
+    Object.entries(types).sort((a,b)=>b[1]-a[1]).forEach(([t,c])=>console.log('  ',t+':',c));
+    console.log('\nSample road names:');
+    [...new Set(ways.filter(w=>w.tags.name).map(w=>w.tags.name))].slice(0,20)
+      .forEach(n=>console.log('  -',n));
   });
 });
 
-req.on('error', e => { console.error('Error:', e.message); process.exit(1); });
+req.on('error', e => { console.error('Request error:', e.message); process.exit(1); });
 req.write(query);
 req.end();

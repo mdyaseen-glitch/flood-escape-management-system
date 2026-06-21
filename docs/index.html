@@ -1,614 +1,575 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FloodNav — Kengeri Flood Route Planner</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <style>
-    :root {
-      --bg-dark: #0a0e1a;
-      --bg-panel: #0f1526;
-      --bg-card: #141c30;
-      --bg-card2: #1a2240;
-      --border: #1e2d50;
-      --border-light: #253560;
-      --accent-safe: #00e676;
-      --accent-flood: #ff3b3b;
-      --accent-route: #00bcd4;
-      --accent-normal: #ff9800;
-      --accent-yellow: #ffe600;
-      --text-primary: #e8edf5;
-      --text-secondary: #8899bb;
-      --text-muted: #4a5878;
-      --font-mono: 'Space Mono', monospace;
-      --font-head: 'Syne', sans-serif;
-      --sidebar-w: 320px;
-      --header-h: 58px;
-      --radius: 10px;
-      --shadow: 0 4px 24px rgba(0,0,0,0.5);
-    }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; background: var(--bg-dark); color: var(--text-primary); font-family: var(--font-head); font-size: 14px; overflow: hidden; }
-    .header { height: var(--header-h); background: var(--bg-panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; position: fixed; top: 0; left: 0; right: 0; z-index: 100; }
-    .header-inner { width: 100%; display: flex; align-items: center; justify-content: space-between; }
-    .logo { display: flex; align-items: center; gap: 12px; }
-    .logo-icon { font-size: 22px; }
-    .logo-title { display: block; font-family: var(--font-head); font-weight: 800; font-size: 18px; letter-spacing: -0.5px; color: var(--accent-route); }
-    .logo-sub { display: block; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); letter-spacing: 0.5px; }
-    .header-status { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); }
-    .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-safe); box-shadow: 0 0 0 0 rgba(0,230,118,0.4); animation: pulse 2s infinite; }
-    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0,230,118,0.4); } 70% { box-shadow: 0 0 0 8px rgba(0,230,118,0); } 100% { box-shadow: 0 0 0 0 rgba(0,230,118,0); } }
-    .app-layout { display: flex; height: calc(100vh - var(--header-h)); margin-top: var(--header-h); }
-    .sidebar { width: var(--sidebar-w); background: var(--bg-panel); border-right: 1px solid var(--border); overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0; }
-    .sidebar::-webkit-scrollbar { width: 4px; }
-    .sidebar::-webkit-scrollbar-track { background: transparent; }
-    .sidebar::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 2px; }
-    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
-    .card-title { font-family: var(--font-head); font-weight: 700; font-size: 13px; color: var(--text-primary); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 1px; }
-    .card-desc { font-size: 11px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5; }
-    .form-group { margin-bottom: 10px; }
-    .form-group label { display: block; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
-    .search-wrap { position: relative; }
-    .search-input { width: 100%; background: var(--bg-dark); border: 1px solid var(--border-light); border-radius: 6px; padding: 8px 10px; color: var(--text-primary); font-family: var(--font-mono); font-size: 12px; outline: none; transition: border-color 0.2s; }
-    .search-input:focus { border-color: var(--accent-route); box-shadow: 0 0 0 2px rgba(0,188,212,0.15); }
-    .search-input::placeholder { color: var(--text-muted); }
-    .dropdown-list { position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-card2); border: 1px solid var(--border-light); border-top: none; border-radius: 0 0 6px 6px; max-height: 200px; overflow-y: auto; z-index: 9999; display: none; }
-    .dropdown-list.open { display: block; }
-    .dropdown-item { padding: 7px 10px; font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); cursor: pointer; border-bottom: 1px solid var(--border); }
-    .dropdown-item:hover { background: var(--accent-route); color: var(--bg-dark); }
-    .dropdown-list::-webkit-scrollbar { width: 4px; }
-    .dropdown-list::-webkit-scrollbar-thumb { background: var(--border-light); }
-    .swap-btn-wrap { display: flex; justify-content: flex-end; margin: -4px 0; }
-    .swap-btn-wrap button { background: var(--bg-card2); border: 1px solid var(--border-light); color: var(--accent-route); border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
-    .swap-btn-wrap button:hover { background: var(--accent-route); color: var(--bg-dark); }
-    .btn-primary { width: 100%; padding: 11px; background: var(--accent-route); color: var(--bg-dark); border: none; border-radius: 6px; font-family: var(--font-head); font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s; margin-top: 4px; }
-    .btn-primary:hover { background: #29e1f5; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,188,212,0.4); }
-    .btn-primary:active { transform: translateY(0); }
-    .btn-secondary { width: 100%; padding: 10px; background: transparent; color: var(--accent-flood); border: 1px solid var(--accent-flood); border-radius: 6px; font-family: var(--font-head); font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s; margin-top: 4px; }
-    .btn-secondary:hover { background: var(--accent-flood); color: white; }
-    .tip-box { margin-top: 10px; padding: 8px 10px; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 6px; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); line-height: 1.6; }
-    .legend-items { display: flex; flex-direction: column; gap: 8px; }
-    .legend-item { display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); }
-    .legend-dot { width: 14px; height: 6px; border-radius: 3px; flex-shrink: 0; }
-    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .stat-box { background: var(--bg-dark); border: 1px solid var(--border); border-radius: 6px; padding: 10px; text-align: center; }
-    .stat-number { font-family: var(--font-mono); font-size: 22px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
-    .stat-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-    .stat-number.danger { color: var(--accent-flood); }
-    .stat-number.safe-c { color: var(--accent-safe); }
-    .stat-number.warn   { color: var(--accent-yellow); }
-    .stat-number.info   { color: var(--accent-route); }
-    .filter-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
-    .filter-tab { flex: 1; padding: 5px 4px; border-radius: 5px; border: 1px solid var(--border-light); background: var(--bg-dark); color: var(--text-muted); font-family: var(--font-mono); font-size: 10px; cursor: pointer; text-align: center; transition: all 0.2s; }
-    .filter-tab.active-red    { background: rgba(255,59,59,0.2);  border-color: #ff3b3b; color: #ff3b3b; }
-    .filter-tab.active-yellow { background: rgba(255,230,0,0.15); border-color: #ffe600; color: #ffe600; }
-    .filter-tab.active-green  { background: rgba(0,230,118,0.15); border-color: #00e676; color: #00e676; }
-    .filter-tab.active-all    { background: rgba(0,188,212,0.15); border-color: #00bcd4; color: #00bcd4; }
-    .map-container { flex: 1; position: relative; overflow: hidden; }
-    #map { width: 100%; height: 100%; background: var(--bg-dark); }
-    .map-loading { position: absolute; inset: 0; background: rgba(10,14,26,0.85); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 50; backdrop-filter: blur(4px); }
-    .map-loading.active { display: flex; }
-    .map-loading p { font-family: var(--font-mono); font-size: 12px; color: var(--accent-route); letter-spacing: 1px; }
-    .loader-ring { width: 44px; height: 44px; border: 3px solid var(--border); border-top-color: var(--accent-route); border-radius: 50%; animation: spin 0.8s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .route-result { position: absolute; bottom: 20px; left: 20px; width: 360px; background: var(--bg-panel); border: 1px solid var(--border-light); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); z-index: 40; max-height: 60vh; overflow-y: auto; transition: all 0.3s; }
-    .route-result.hidden { display: none; }
-    .close-btn { position: absolute; top: 10px; right: 12px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; }
-    .close-btn:hover { color: var(--text-primary); }
-    .result-divider { height: 1px; background: var(--border); margin: 12px 0; }
-    .result-summary { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); background: var(--bg-card); padding: 8px 10px; border-radius: 6px; line-height: 1.6; }
-    .result-summary span { color: var(--accent-route); font-weight: 700; }
-    .no-route-msg { font-family: var(--font-mono); font-size: 11px; color: var(--accent-flood); background: rgba(255,59,59,0.1); border: 1px solid rgba(255,59,59,0.3); padding: 8px 10px; border-radius: 6px; }
-    .node-tooltip { background: #0f1526 !important; border: 1px solid #1e2d50 !important; color: #e8edf5 !important; font-family: 'Space Mono', monospace !important; font-size: 11px !important; padding: 3px 7px !important; border-radius: 4px !important; box-shadow: none !important; }
-    .node-tooltip::before { display: none !important; }
-    .route-result::-webkit-scrollbar { width: 4px; }
-    .route-result::-webkit-scrollbar-track { background: transparent; }
-    .route-result::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 2px; }
-    @media (max-width: 768px) {
-      :root { --sidebar-w: 100%; }
-      .app-layout { flex-direction: column; overflow-y: auto; height: auto; }
-      .sidebar { width: 100%; height: auto; overflow-y: visible; }
-      .map-container { height: 60vh; flex-shrink: 0; }
-      .route-result { width: calc(100% - 32px); bottom: 10px; left: 16px; }
-      body, html { overflow: auto; }
-    }
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>FloodNav — Kengeri Flood Escape System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+:root{
+  --bg-dark:#0a0e1a;--bg-panel:#0f1526;--bg-card:#141c30;--bg-card2:#1a2240;
+  --border:#1e2d50;--border-light:#253560;
+  --accent-safe:#00e676;--accent-flood:#ff3b3b;--accent-route:#00bcd4;
+  --accent-normal:#ff9800;--accent-yellow:#ffe600;
+  --text-primary:#e8edf5;--text-secondary:#8899bb;--text-muted:#4a5878;
+  --font-mono:'Space Mono',monospace;--font-head:'Syne',sans-serif;
+  --sidebar-w:320px;--header-h:58px;--radius:10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--bg-dark);color:var(--text-primary);font-family:var(--font-head);font-size:14px;overflow:hidden;}
+</style>
 </head>
+<style>
+.header{height:var(--header-h);background:var(--bg-panel);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;position:fixed;top:0;left:0;right:0;z-index:200;}
+.header-inner{width:100%;display:flex;align-items:center;justify-content:space-between;}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-icon{font-size:22px;}
+.logo-title{display:block;font-family:var(--font-head);font-weight:800;font-size:18px;color:var(--accent-route);}
+.logo-sub{display:block;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);letter-spacing:.5px;}
+.header-status{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);}
+.pulse-dot{width:8px;height:8px;border-radius:50%;background:var(--accent-safe);animation:pulse 2s infinite;}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(0,230,118,.4);}70%{box-shadow:0 0 0 8px rgba(0,230,118,0);}100%{box-shadow:0 0 0 0 rgba(0,230,118,0);}}
+.app-layout{display:flex;height:calc(100vh - var(--header-h));margin-top:var(--header-h);}
+.sidebar{width:var(--sidebar-w);background:var(--bg-panel);border-right:1px solid var(--border);overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px;flex-shrink:0;}
+.sidebar::-webkit-scrollbar{width:4px;}.sidebar::-webkit-scrollbar-thumb{background:var(--border-light);}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;}
+.card-title{font-family:var(--font-head);font-weight:700;font-size:12px;color:var(--text-primary);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;}
+.card-desc{font-size:11px;color:var(--text-secondary);margin-bottom:10px;line-height:1.5;}
+</style>
+<style>
+.mode-toggle{display:flex;gap:6px;margin-bottom:12px;}
+.mode-btn{flex:1;padding:7px 4px;border-radius:6px;border:1px solid var(--border-light);background:var(--bg-dark);color:var(--text-muted);font-family:var(--font-mono);font-size:10px;cursor:pointer;text-align:center;transition:all .2s;}
+.mode-btn.active{background:var(--accent-route);color:var(--bg-dark);border-color:var(--accent-route);font-weight:700;}
+.btn-primary{width:100%;padding:10px;background:var(--accent-route);color:var(--bg-dark);border:none;border-radius:6px;font-family:var(--font-head);font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;margin-top:4px;}
+.btn-primary:hover{background:#29e1f5;transform:translateY(-1px);}
+.btn-secondary{width:100%;padding:9px;background:transparent;color:var(--accent-flood);border:1px solid var(--accent-flood);border-radius:6px;font-family:var(--font-head);font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;margin-top:6px;}
+.btn-secondary:hover{background:var(--accent-flood);color:#fff;}
+.btn-reset{width:100%;padding:8px;background:transparent;color:var(--text-muted);border:1px solid var(--border-light);border-radius:6px;font-family:var(--font-mono);font-size:11px;cursor:pointer;transition:all .2s;margin-top:8px;}
+.btn-reset:hover{border-color:var(--text-secondary);color:var(--text-primary);}
+.search-wrap{position:relative;}
+.search-input{width:100%;background:var(--bg-dark);border:1px solid var(--border-light);border-radius:6px;padding:8px 10px;color:var(--text-primary);font-family:var(--font-mono);font-size:12px;outline:none;transition:border-color .2s;}
+.search-input:focus{border-color:var(--accent-route);}
+.search-input::placeholder{color:var(--text-muted);}
+.dropdown-list{position:absolute;top:100%;left:0;right:0;background:var(--bg-card2);border:1px solid var(--border-light);border-top:none;border-radius:0 0 6px 6px;max-height:180px;overflow-y:auto;z-index:9999;display:none;}
+.dropdown-list.open{display:block;}
+.dropdown-item{padding:7px 10px;font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);cursor:pointer;border-bottom:1px solid var(--border);}
+.dropdown-item:hover{background:var(--accent-route);color:var(--bg-dark);}
+.form-group{margin-bottom:10px;}
+.form-group label{display:block;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;}
+.swap-btn-wrap{display:flex;justify-content:flex-end;margin:-4px 0;}
+.swap-btn-wrap button{background:var(--bg-card2);border:1px solid var(--border-light);color:var(--accent-route);border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:13px;transition:all .2s;}
+.swap-btn-wrap button:hover{background:var(--accent-route);color:var(--bg-dark);}
+</style>
+<style>
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.stat-box{background:var(--bg-dark);border:1px solid var(--border);border-radius:6px;padding:10px;text-align:center;}
+.stat-number{font-family:var(--font-mono);font-size:20px;font-weight:700;line-height:1;margin-bottom:4px;}
+.stat-label{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;}
+.stat-number.danger{color:var(--accent-flood);}.stat-number.warn{color:var(--accent-yellow);}
+.stat-number.safe-c{color:var(--accent-safe);}.stat-number.info{color:var(--accent-route);}
+.legend-items{display:flex;flex-direction:column;gap:8px;}
+.legend-item{display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);}
+.legend-dot{width:14px;height:6px;border-radius:3px;flex-shrink:0;}
+.filter-tabs{display:flex;gap:6px;}
+.filter-tab{flex:1;padding:5px 4px;border-radius:5px;border:1px solid var(--border-light);background:var(--bg-dark);color:var(--text-muted);font-family:var(--font-mono);font-size:10px;cursor:pointer;text-align:center;transition:all .2s;}
+.filter-tab.active-red{background:rgba(255,59,59,.2);border-color:#ff3b3b;color:#ff3b3b;}
+.filter-tab.active-yellow{background:rgba(255,230,0,.15);border-color:#ffe600;color:#ffe600;}
+.filter-tab.active-green{background:rgba(0,230,118,.15);border-color:#00e676;color:#00e676;}
+.filter-tab.active-all{background:rgba(0,188,212,.15);border-color:#00bcd4;color:#00bcd4;}
+.map-container{flex:1;position:relative;overflow:hidden;}
+#map{width:100%;height:100%;background:var(--bg-dark);}
+.map-loading{position:absolute;inset:0;background:rgba(10,14,26,.85);display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:50;backdrop-filter:blur(4px);}
+.map-loading.active{display:flex;}
+.map-loading p{font-family:var(--font-mono);font-size:12px;color:var(--accent-route);letter-spacing:1px;}
+.loader-ring{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--accent-route);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.route-result{position:absolute;bottom:20px;left:20px;width:340px;background:var(--bg-panel);border:1px solid var(--border-light);border-radius:var(--radius);padding:14px;box-shadow:0 4px 24px rgba(0,0,0,.5);z-index:40;max-height:55vh;overflow-y:auto;}
+.route-result.hidden{display:none;}
+.close-btn{position:absolute;top:10px;right:12px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;}
+.result-divider{height:1px;background:var(--border);margin:10px 0;}
+.result-summary{font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);background:var(--bg-card);padding:8px 10px;border-radius:6px;line-height:1.6;}
+.result-summary span{color:var(--accent-route);font-weight:700;}
+.no-route-msg{font-family:var(--font-mono);font-size:11px;color:var(--accent-flood);background:rgba(255,59,59,.1);border:1px solid rgba(255,59,59,.3);padding:8px 10px;border-radius:6px;}
+.node-tooltip{background:#0f1526!important;border:1px solid #1e2d50!important;color:#e8edf5!important;font-family:'Space Mono',monospace!important;font-size:11px!important;padding:3px 7px!important;border-radius:4px!important;box-shadow:none!important;}
+.node-tooltip::before{display:none!important;}
+.tip-box{margin-top:10px;padding:8px 10px;background:var(--bg-dark);border:1px solid var(--border);border-radius:6px;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);line-height:1.6;}
+.road-popup-btn{padding:4px 10px;border-radius:4px;border:none;cursor:pointer;font-size:11px;font-weight:700;transition:all .2s;}
+.road-popup-btn:hover{opacity:.85;}
+@media(max-width:768px){:root{--sidebar-w:100%;}.app-layout{flex-direction:column;overflow-y:auto;height:auto;}.sidebar{width:100%;height:auto;overflow-y:visible;}.map-container{height:60vh;}.route-result{width:calc(100% - 32px);left:16px;}html,body{overflow:auto;}}
+</style>
 <body>
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <span class="logo-icon">🌊</span>
+      <span>
+        <span class="logo-title">FloodNav</span>
+        <span class="logo-sub">KENGERI · REAL OSM ROADS · BENGALURU</span>
+      </span>
+    </div>
+    <div class="header-status"><div class="pulse-dot"></div><span>LIVE · KENGERI</span></div>
+  </div>
+</header>
 
-  <header class="header">
-    <div class="header-inner">
-      <div class="logo">
-        <span class="logo-icon">🌊</span>
-        <span>
-          <span class="logo-title">FloodNav</span>
-          <span class="logo-sub">KENGERI · REAL OSM ROADS · BENGALURU</span>
-        </span>
-      </div>
-      <div class="header-status">
-        <div class="pulse-dot"></div>
-        <span>LIVE · KENGERI</span>
+<div class="app-layout">
+  <aside class="sidebar">
+
+    <!-- MODE TOGGLE -->
+    <div class="mode-toggle">
+      <div class="mode-btn active" id="btnModeStatus" onclick="switchMode('status')">📍 Set Road Status</div>
+      <div class="mode-btn" id="btnModeRoute"  onclick="switchMode('route')">🗺 Find Safe Route</div>
+    </div>
+
+    <!-- MODE 1: SET STATUS -->
+    <div id="panelStatus">
+      <div class="card">
+        <div class="card-title">📍 Road Status Editor</div>
+        <p class="card-desc">Click any road on the map to mark it as flooded, cautionary, or safe.</p>
+        <div class="tip-box">🔴 Click a road → choose its flood level in the popup.<br/>Changes update the map and stats instantly.</div>
+        <button class="btn-reset" onclick="resetAllStatus()">↺ Reset All Roads to Default</button>
       </div>
     </div>
-  </header>
 
-  <div class="app-layout">
-    <aside class="sidebar">
-
-      <!-- Route Planner -->
+    <!-- MODE 2: FIND ROUTE -->
+    <div id="panelRoute" style="display:none">
       <div class="card">
         <div class="card-title">🗺 Route Planner</div>
         <p class="card-desc">Type to search or click the map to pick points.</p>
-
         <div class="form-group">
           <label>From</label>
           <div class="search-wrap">
-            <input type="text" id="srcInput" class="search-input" placeholder="Search start point…" autocomplete="off" />
+            <input type="text" id="srcInput" class="search-input" placeholder="Search start point…" autocomplete="off"/>
             <div class="dropdown-list" id="srcDropdown"></div>
-            <input type="hidden" id="sourceId" />
+            <input type="hidden" id="sourceId"/>
           </div>
         </div>
-
-        <div class="swap-btn-wrap">
-          <button onclick="swapLocations()" title="Swap">⇅</button>
-        </div>
-
+        <div class="swap-btn-wrap"><button onclick="swapLocations()" title="Swap">⇅</button></div>
         <div class="form-group">
           <label>To</label>
           <div class="search-wrap">
-            <input type="text" id="dstInput" class="search-input" placeholder="Search destination…" autocomplete="off" />
+            <input type="text" id="dstInput" class="search-input" placeholder="Search destination…" autocomplete="off"/>
             <div class="dropdown-list" id="dstDropdown"></div>
-            <input type="hidden" id="destId" />
+            <input type="hidden" id="destId"/>
           </div>
         </div>
-
         <button class="btn-primary" onclick="calculateRoute()">⚡ Find Safe Route</button>
-        <button class="btn-secondary" onclick="clearAll()" style="margin-top:8px">✕ Clear</button>
-
-        <div class="tip-box">
-          💡 <b style="color:var(--text-secondary)">Tip:</b> Click the map to set source, click again to set destination. Third click resets.
-        </div>
-      </div>
-
-      <!-- Legend -->
-      <div class="card">
-        <div class="card-title">🗂 Road Status</div>
-        <div class="legend-items">
-          <div class="legend-item">
-            <div class="legend-dot" style="background:#ff3b3b;box-shadow:0 0 6px #ff3b3b"></div>
-            <span><b style="color:#ff3b3b">RED</b> — Flooded, impassable</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-dot" style="background:#ffe600;box-shadow:0 0 5px #ffe600"></div>
-            <span><b style="color:#ffe600">YELLOW</b> — Waterlogged, passable</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-dot" style="background:#00e676;box-shadow:0 0 5px #00e676"></div>
-            <span><b style="color:#00e676">GREEN</b> — Safe, no water</span>
-          </div>
-          <div class="legend-item" style="margin-top:6px">
-            <div class="legend-dot" style="background:#1976D2;box-shadow:0 0 6px #1976D2"></div>
-            <span><b style="color:#42A5F5">BLUE</b> — Recommended safe route</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-dot" style="background:#ff9800"></div>
-            <span><b style="color:#ff9800">ORANGE</b> — Shortest route</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Stats -->
-      <div class="card">
-        <div class="card-title">📊 Live Stats</div>
-        <div class="stats-grid" id="statsGrid">
-          <div class="stat-box"><div class="stat-number danger" id="statRed">—</div><div class="stat-label">🔴 Flooded</div></div>
-          <div class="stat-box"><div class="stat-number warn"   id="statYellow">—</div><div class="stat-label">🟡 Caution</div></div>
-          <div class="stat-box"><div class="stat-number safe-c" id="statGreen">—</div><div class="stat-label">🟢 Safe</div></div>
-          <div class="stat-box"><div class="stat-number info"   id="statTotal">—</div><div class="stat-label">Total Roads</div></div>
-        </div>
-      </div>
-
-      <!-- Filter -->
-      <div class="card">
-        <div class="card-title">🔍 Filter Roads</div>
-        <div class="filter-tabs">
-          <div class="filter-tab active-all" id="tab-all"    onclick="filterRoads('all')">ALL</div>
-          <div class="filter-tab"            id="tab-red"    onclick="filterRoads('red')">🔴 RED</div>
-          <div class="filter-tab"            id="tab-yellow" onclick="filterRoads('yellow')">🟡 YLW</div>
-          <div class="filter-tab"            id="tab-green"  onclick="filterRoads('green')">🟢 GRN</div>
-        </div>
-        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text-muted)">
-          Click any road on the map to see its details.
-        </div>
-      </div>
-
-    </aside>
-
-    <div class="map-container">
-      <div id="map"></div>
-      <div class="map-loading" id="mapLoading">
-        <div class="loader-ring"></div>
-        <p id="loadingText">LOADING…</p>
-      </div>
-      <div class="route-result hidden" id="routeResult">
-        <button class="close-btn" onclick="closeResult()">✕</button>
-        <div id="routeResultContent"></div>
+        <button class="btn-secondary" onclick="clearAll()">✕ Clear</button>
+        <div class="tip-box">💡 Click map to set From → To. Third click resets.</div>
       </div>
     </div>
+
+    <!-- LEGEND -->
+    <div class="card">
+      <div class="card-title">🗂 Legend</div>
+      <div class="legend-items">
+        <div class="legend-item"><div class="legend-dot" style="background:#ff3b3b;box-shadow:0 0 6px #ff3b3b"></div><span><b style="color:#ff3b3b">RED</b> — Flooded, impassable</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ffe600;box-shadow:0 0 5px #ffe600"></div><span><b style="color:#ffe600">YELLOW</b> — Waterlogged, passable</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00e676;box-shadow:0 0 5px #00e676"></div><span><b style="color:#00e676">GREEN</b> — Safe, no water</span></div>
+        <div class="legend-item" style="margin-top:4px"><div class="legend-dot" style="background:#1976D2"></div><span><b style="color:#42A5F5">BLUE</b> — Safe route</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff9800"></div><span><b style="color:#ff9800">ORANGE</b> — Shortest route</span></div>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="card">
+      <div class="card-title">📊 Live Stats</div>
+      <div class="stats-grid">
+        <div class="stat-box"><div class="stat-number danger" id="statRed">—</div><div class="stat-label">🔴 Flooded</div></div>
+        <div class="stat-box"><div class="stat-number warn"   id="statYellow">—</div><div class="stat-label">🟡 Caution</div></div>
+        <div class="stat-box"><div class="stat-number safe-c" id="statGreen">—</div><div class="stat-label">🟢 Safe</div></div>
+        <div class="stat-box"><div class="stat-number info"   id="statTotal">—</div><div class="stat-label">Total</div></div>
+      </div>
+    </div>
+
+    <!-- FILTER -->
+    <div class="card">
+      <div class="card-title">🔍 Filter Roads</div>
+      <div class="filter-tabs">
+        <div class="filter-tab active-all" id="tab-all"    onclick="filterRoads('all')">ALL</div>
+        <div class="filter-tab"            id="tab-red"    onclick="filterRoads('red')">🔴</div>
+        <div class="filter-tab"            id="tab-yellow" onclick="filterRoads('yellow')">🟡</div>
+        <div class="filter-tab"            id="tab-green"  onclick="filterRoads('green')">🟢</div>
+      </div>
+    </div>
+
+  </aside>
+
+  <div class="map-container">
+    <div id="map"></div>
+    <div class="map-loading" id="mapLoading"><div class="loader-ring"></div><p id="loadingText">LOADING…</p></div>
+    <div class="route-result hidden" id="routeResult">
+      <button class="close-btn" onclick="closeResult()">✕</button>
+      <div id="routeResultContent"></div>
+    </div>
   </div>
+</div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="floodData.js"></script>
-  <script src="dijkstra.js"></script>
-  <script>
-    // ── MAP SETUP ─────────────────────────────────────────────────────
-    var map = L.map('map', { center: [12.9060, 77.5077], zoom: 15 });
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="floodData.js"></script>
+<script src="dijkstra.js"></script>
+<script>
+// ── MAP ──────────────────────────────────────────────────────────────
+var map = L.map('map', { center: [12.90961, 77.50747], zoom: 14 });
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 19
+}).addTo(map);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19
-    }).addTo(map);
+var roadLayer  = L.layerGroup().addTo(map);
+var routeLayer = L.layerGroup().addTo(map);
+var pinLayer   = L.layerGroup().addTo(map);
 
-    var roadLayer  = L.layerGroup().addTo(map);
-    var routeLayer = L.layerGroup().addTo(map);
-    var pinLayer   = L.layerGroup().addTo(map);
+// ── STATUS CONFIG ─────────────────────────────────────────────────────
+var STATUS_CFG = {
+  red:    { color: '#ff3b3b', weight: 4, dash: '7 4',  label: '🔴 Flooded — Impassable'    },
+  yellow: { color: '#ffe600', weight: 4, dash: '10 4', label: '🟡 Waterlogged — Drive Slow' },
+  green:  { color: '#00e676', weight: 3, dash: null,   label: '🟢 Safe — No Water'          }
+};
 
-    // ── STATUS CONFIG ─────────────────────────────────────────────────
-    var STATUS_CFG = {
-      red:    { color: '#ff3b3b', weight: 4, dash: '7 4',  label: '🔴 Flooded — Impassable'    },
-      yellow: { color: '#ffe600', weight: 4, dash: '10 4', label: '🟡 Waterlogged — Drive Slow' },
-      green:  { color: '#00e676', weight: 3, dash: null,   label: '🟢 Safe — No Water'          }
-    };
+// ── ORIGINAL STATUS (for reset) ───────────────────────────────────────
+var originalStatus = {};
+ALL_ROADS.forEach(function(r) { originalStatus[r.id] = r.status; });
 
-    // ── DRAW ALL ROADS ────────────────────────────────────────────────
-    var roadPolylines = {};
+// ── DRAW ALL ROADS ────────────────────────────────────────────────────
+var roadPolylines = {};
 
-    function drawAllRoads() {
-      roadLayer.clearLayers();
-      ALL_ROADS.forEach(function(road) {
-        var cfg  = STATUS_CFG[road.status] || STATUS_CFG['green'];
-        var opts = { color: cfg.color, weight: cfg.weight, opacity: 0.85 };
-        if (cfg.dash) opts.dashArray = cfg.dash;
+function makePopupHTML(road) {
+  var cfg = STATUS_CFG[road.status] || STATUS_CFG['green'];
+  return '<div style="font-family:sans-serif;padding:10px 12px;min-width:210px">'
+    + '<b style="font-size:13px">' + road.name + '</b><br/>'
+    + '<span style="color:' + cfg.color + ';font-size:11px;font-weight:700">' + cfg.label + '</span><br/>'
+    + '<span style="font-size:10px;color:#888">' + road.distance + ' km · ' + road.highway + '</span>'
+    + '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">'
+    + '<button class="road-popup-btn" style="background:#ff3b3b;color:#fff" onclick="setRoadStatus(\'' + road.id + '\',\'red\')">🔴 Flood</button>'
+    + '<button class="road-popup-btn" style="background:#ffe600;color:#000" onclick="setRoadStatus(\'' + road.id + '\',\'yellow\')">🟡 Caution</button>'
+    + '<button class="road-popup-btn" style="background:#00e676;color:#000" onclick="setRoadStatus(\'' + road.id + '\',\'green\')">🟢 Safe</button>'
+    + '</div></div>';
+}
 
-        var line = L.polyline(road.coords, opts);
-        line.bindPopup(
-          '<div style="font-family:sans-serif;padding:8px 10px;min-width:190px">' +
-          '<b style="font-size:13px">' + road.name + '</b><br/>' +
-          '<span style="color:' + cfg.color + ';font-weight:700;font-size:11px">' + cfg.label + '</span><br/>' +
-          '<span style="font-size:11px;color:#888">' + road.distance + ' km</span>' +
-          '</div>'
-        );
-        roadLayer.addLayer(line);
-        roadPolylines[road.id] = { line: line, status: road.status };
+function drawAllRoads() {
+  roadLayer.clearLayers();
+  ALL_ROADS.forEach(function(road) {
+    var cfg  = STATUS_CFG[road.status] || STATUS_CFG['green'];
+    var opts = { color: cfg.color, weight: cfg.weight, opacity: 0.85 };
+    if (cfg.dash) opts.dashArray = cfg.dash;
+    var line = L.polyline(road.coords, opts);
+    line.bindPopup(makePopupHTML(road), { maxWidth: 260 });
+    roadLayer.addLayer(line);
+    roadPolylines[road.id] = { line: line, status: road.status };
+  });
+}
+</script>
+<script>
+// ── SET ROAD STATUS (called from popup buttons) ───────────────────────
+function setRoadStatus(roadId, status) {
+  var road = ALL_ROADS.find(function(r) { return r.id === roadId; });
+  if (!road) return;
+  road.status = status;
+  var cfg   = STATUS_CFG[status];
+  var entry = roadPolylines[roadId];
+  if (entry) {
+    entry.line.setStyle({ color: cfg.color, weight: cfg.weight, dashArray: cfg.dash || null, opacity: 0.85 });
+    entry.line.setPopupContent(makePopupHTML(road));
+    entry.status = status;
+  }
+  updateStats();
+  map.closePopup();
+}
+
+// ── RESET ALL ROADS ───────────────────────────────────────────────────
+function resetAllStatus() {
+  ALL_ROADS.forEach(function(road) {
+    if (road.status !== originalStatus[road.id]) {
+      setRoadStatus(road.id, originalStatus[road.id]);
+    }
+  });
+  updateStats();
+}
+
+// ── STATS ─────────────────────────────────────────────────────────────
+function updateStats() {
+  var red    = ALL_ROADS.filter(function(r) { return r.status === 'red';    }).length;
+  var yellow = ALL_ROADS.filter(function(r) { return r.status === 'yellow'; }).length;
+  var green  = ALL_ROADS.filter(function(r) { return r.status === 'green';  }).length;
+  document.getElementById('statRed').textContent    = red;
+  document.getElementById('statYellow').textContent = yellow;
+  document.getElementById('statGreen').textContent  = green;
+  document.getElementById('statTotal').textContent  = ALL_ROADS.length;
+}
+
+// ── FILTER ────────────────────────────────────────────────────────────
+function filterRoads(filter) {
+  ['all','red','yellow','green'].forEach(function(f) {
+    var el = document.getElementById('tab-' + f);
+    el.className = 'filter-tab' + (f === filter ? ' active-' + f : '');
+  });
+  Object.keys(roadPolylines).forEach(function(id) {
+    var entry = roadPolylines[id];
+    var show  = filter === 'all' || entry.status === filter;
+    if (show  && !roadLayer.hasLayer(entry.line)) roadLayer.addLayer(entry.line);
+    if (!show &&  roadLayer.hasLayer(entry.line)) roadLayer.removeLayer(entry.line);
+  });
+}
+
+// ── MODE SWITCH ───────────────────────────────────────────────────────
+var currentMode = 'status';
+function switchMode(mode) {
+  currentMode = mode;
+  document.getElementById('panelStatus').style.display = mode === 'status' ? '' : 'none';
+  document.getElementById('panelRoute').style.display  = mode === 'route'  ? '' : 'none';
+  document.getElementById('btnModeStatus').className   = 'mode-btn' + (mode === 'status' ? ' active' : '');
+  document.getElementById('btnModeRoute').className    = 'mode-btn' + (mode === 'route'  ? ' active' : '');
+  if (mode === 'status') { clearAll(); }
+}
+
+// ── PIN MANAGEMENT ────────────────────────────────────────────────────
+var srcPin = null, dstPin = null;
+function makePinIcon(color) {
+  return L.divIcon({
+    className: '',
+    html: '<div style="background:' + color + ';width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 12px ' + color + '"></div>',
+    iconSize: [16,16], iconAnchor: [8,8]
+  });
+}
+function setSourcePin(node) {
+  if (srcPin) { pinLayer.removeLayer(srcPin); srcPin = null; }
+  srcPin = L.marker([node.lat, node.lng], { icon: makePinIcon('#00e676') })
+    .bindTooltip('🟢 START: ' + node.name, { permanent: true, direction: 'top', className: 'node-tooltip', offset: [0,-12] })
+    .addTo(pinLayer);
+}
+function setDestPin(node) {
+  if (dstPin) { pinLayer.removeLayer(dstPin); dstPin = null; }
+  dstPin = L.marker([node.lat, node.lng], { icon: makePinIcon('#ff3b3b') })
+    .bindTooltip('🔴 END: ' + node.name, { permanent: true, direction: 'top', className: 'node-tooltip', offset: [0,-12] })
+    .addTo(pinLayer);
+}
+function clearPins() {
+  if (srcPin) { pinLayer.removeLayer(srcPin); srcPin = null; }
+  if (dstPin) { pinLayer.removeLayer(dstPin); dstPin = null; }
+}
+</script>
+<script>
+// ── SEARCHABLE DROPDOWN ───────────────────────────────────────────────
+function buildDropdown(inputId, dropdownId, hiddenId, type) {
+  var input    = document.getElementById(inputId);
+  var dropdown = document.getElementById(dropdownId);
+  var hidden   = document.getElementById(hiddenId);
+
+  input.addEventListener('input', function() {
+    var q = input.value.trim().toLowerCase();
+    if (q.length < 2) { dropdown.classList.remove('open'); return; }
+    var matches = ALL_NODES.filter(function(n) {
+      return n.name.toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 30);
+    if (!matches.length) { dropdown.classList.remove('open'); return; }
+    dropdown.innerHTML = matches.map(function(n) {
+      return '<div class="dropdown-item" data-id="' + n.id + '">' + n.name + '</div>';
+    }).join('');
+    dropdown.classList.add('open');
+    dropdown.querySelectorAll('.dropdown-item').forEach(function(item) {
+      item.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        var node = ALL_NODES.find(function(n) { return n.id === item.dataset.id; });
+        if (!node) return;
+        input.value  = node.name;
+        hidden.value = node.id;
+        dropdown.classList.remove('open');
+        if (type === 'src') setSourcePin(node);
+        else                setDestPin(node);
+        map.setView([node.lat, node.lng], 16);
       });
-    }
-
-    // ── FILTER ────────────────────────────────────────────────────────
-    function filterRoads(filter) {
-      ['all','red','yellow','green'].forEach(function(f) {
-        var el = document.getElementById('tab-' + f);
-        el.className = 'filter-tab' + (f === filter ? ' active-' + f : '');
-      });
-      Object.keys(roadPolylines).forEach(function(id) {
-        var entry = roadPolylines[id];
-        var show  = filter === 'all' || entry.status === filter;
-        if (show && !roadLayer.hasLayer(entry.line)) roadLayer.addLayer(entry.line);
-        if (!show && roadLayer.hasLayer(entry.line)) roadLayer.removeLayer(entry.line);
-      });
-    }
-
-    // ── STATS (computed from ALL_ROADS — no API call) ─────────────────
-    function loadStats() {
-      var red    = ALL_ROADS.filter(function(r) { return r.status === 'red';    }).length;
-      var yellow = ALL_ROADS.filter(function(r) { return r.status === 'yellow'; }).length;
-      var green  = ALL_ROADS.filter(function(r) { return r.status === 'green';  }).length;
-      var total  = ALL_ROADS.length;
-      document.getElementById('statRed').textContent    = red;
-      document.getElementById('statYellow').textContent = yellow;
-      document.getElementById('statGreen').textContent  = green;
-      document.getElementById('statTotal').textContent  = total;
-    }
-
-    // ── PIN MANAGEMENT ────────────────────────────────────────────────
-    var srcPin = null;
-    var dstPin = null;
-
-    function makePinIcon(color) {
-      return L.divIcon({
-        className: '',
-        html: '<div style="background:' + color + ';width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 12px ' + color + '"></div>',
-        iconSize:   [16, 16],
-        iconAnchor: [8, 8]
-      });
-    }
-
-    function setSourcePin(node) {
-      if (srcPin) { pinLayer.removeLayer(srcPin); srcPin = null; }
-      srcPin = L.marker([node.lat, node.lng], { icon: makePinIcon('#00e676') })
-        .bindTooltip('🟢 START: ' + node.name, { permanent: true, direction: 'top', className: 'node-tooltip', offset: [0, -12] })
-        .addTo(pinLayer);
-    }
-
-    function setDestPin(node) {
-      if (dstPin) { pinLayer.removeLayer(dstPin); dstPin = null; }
-      dstPin = L.marker([node.lat, node.lng], { icon: makePinIcon('#ff3b3b') })
-        .bindTooltip('🔴 END: ' + node.name, { permanent: true, direction: 'top', className: 'node-tooltip', offset: [0, -12] })
-        .addTo(pinLayer);
-    }
-
-    function clearPins() {
-      if (srcPin) { pinLayer.removeLayer(srcPin); srcPin = null; }
-      if (dstPin) { pinLayer.removeLayer(dstPin); dstPin = null; }
-    }
-
-    // ── SEARCHABLE DROPDOWN ───────────────────────────────────────────
-    function buildDropdown(inputId, dropdownId, hiddenId, type) {
-      var input    = document.getElementById(inputId);
-      var dropdown = document.getElementById(dropdownId);
-      var hidden   = document.getElementById(hiddenId);
-
-      input.addEventListener('input', function() {
-        var q = input.value.trim().toLowerCase();
-        if (q.length < 2) { dropdown.classList.remove('open'); return; }
-
-        var matches = ALL_NODES.filter(function(n) {
-          return n.name.toLowerCase().indexOf(q) !== -1;
-        }).slice(0, 30);
-
-        if (!matches.length) { dropdown.classList.remove('open'); return; }
-
-        dropdown.innerHTML = matches.map(function(n) {
-          return '<div class="dropdown-item" data-id="' + n.id + '">' + n.name + '</div>';
-        }).join('');
-        dropdown.classList.add('open');
-
-        dropdown.querySelectorAll('.dropdown-item').forEach(function(item) {
-          item.addEventListener('mousedown', function(e) {
-            e.preventDefault();
-            var nodeId = item.getAttribute('data-id');
-            var node   = ALL_NODES.find(function(n) { return n.id === nodeId; });
-            if (!node) return;
-            input.value  = node.name;
-            hidden.value = node.id;
-            dropdown.classList.remove('open');
-            if (type === 'src') setSourcePin(node);
-            else                setDestPin(node);
-            map.setView([node.lat, node.lng], 16);
-          });
-        });
-      });
-
-      input.addEventListener('blur', function() {
-        setTimeout(function() { dropdown.classList.remove('open'); }, 200);
-      });
-
-      input.addEventListener('change', function() {
-        if (!input.value.trim()) hidden.value = '';
-      });
-    }
-
-    buildDropdown('srcInput', 'srcDropdown', 'sourceId', 'src');
-    buildDropdown('dstInput', 'dstDropdown', 'destId',   'dst');
-
-    // ── MAP CLICK → NEAREST NODE ──────────────────────────────────────
-    function nearestNode(lat, lng) {
-      var best = null, bestDist = Infinity;
-      for (var i = 0; i < ALL_NODES.length; i++) {
-        var n = ALL_NODES[i];
-        var d = Math.sqrt((n.lat - lat) * (n.lat - lat) + (n.lng - lng) * (n.lng - lng));
-        if (d < bestDist) { bestDist = d; best = n; }
-      }
-      return best;
-    }
-
-    map.on('click', function(e) {
-      var node = nearestNode(e.latlng.lat, e.latlng.lng);
-      if (!node) return;
-
-      var srcId    = document.getElementById('sourceId');
-      var dstId    = document.getElementById('destId');
-      var srcInput = document.getElementById('srcInput');
-      var dstInput = document.getElementById('dstInput');
-
-      if (!srcId.value) {
-        srcId.value    = node.id;
-        srcInput.value = node.name;
-        setSourcePin(node);
-        flash(srcInput, '#00e676');
-      } else if (!dstId.value) {
-        dstId.value    = node.id;
-        dstInput.value = node.name;
-        setDestPin(node);
-        flash(dstInput, '#ff3b3b');
-      } else {
-        clearAll();
-        srcId.value    = node.id;
-        srcInput.value = node.name;
-        setSourcePin(node);
-        flash(srcInput, '#00e676');
-      }
     });
+  });
+  input.addEventListener('blur', function() {
+    setTimeout(function() { dropdown.classList.remove('open'); }, 200);
+  });
+  input.addEventListener('change', function() {
+    if (!input.value.trim()) hidden.value = '';
+  });
+}
 
-    function flash(el, color) {
-      el.style.borderColor = color;
-      setTimeout(function() { el.style.borderColor = ''; }, 1500);
-    }
+buildDropdown('srcInput', 'srcDropdown', 'sourceId', 'src');
+buildDropdown('dstInput', 'dstDropdown', 'destId',   'dst');
 
-    // ── ROUTE CALCULATION (client-side, no fetch) ─────────────────────
-    function calculateRoute() {
-      var sourceId = document.getElementById('sourceId').value.trim();
-      var destId   = document.getElementById('destId').value.trim();
+// ── NEAREST NODE ─────────────────────────────────────────────────────
+function nearestNode(lat, lng) {
+  var best = null, bestDist = Infinity;
+  for (var i = 0; i < ALL_NODES.length; i++) {
+    var n = ALL_NODES[i];
+    var d = (n.lat - lat) * (n.lat - lat) + (n.lng - lng) * (n.lng - lng);
+    if (d < bestDist) { bestDist = d; best = n; }
+  }
+  return best;
+}
 
-      if (!sourceId) { alert('Please set a start point (search or click map).'); return; }
-      if (!destId)   { alert('Please set a destination (search or click map).'); return; }
-      if (sourceId === destId) { alert('Start and destination must be different.'); return; }
+// ── MAP CLICK ─────────────────────────────────────────────────────────
+map.on('click', function(e) {
+  // In status mode, clicks are handled by road polyline popups
+  if (currentMode === 'status') return;
 
-      showLoading('CALCULATING SAFE ROUTE…');
+  var node     = nearestNode(e.latlng.lat, e.latlng.lng);
+  if (!node) return;
+  var srcId    = document.getElementById('sourceId');
+  var dstId    = document.getElementById('destId');
+  var srcInput = document.getElementById('srcInput');
+  var dstInput = document.getElementById('dstInput');
 
-      // Run Dijkstra client-side using loaded scripts
-      var result = getRoutes(ALL_NODES, ALL_ROADS, sourceId, destId);
+  if (!srcId.value) {
+    srcId.value = node.id; srcInput.value = node.name;
+    setSourcePin(node); flash(srcInput, '#00e676');
+  } else if (!dstId.value) {
+    dstId.value = node.id; dstInput.value = node.name;
+    setDestPin(node); flash(dstInput, '#ff3b3b');
+  } else {
+    clearAll();
+    srcId.value = node.id; srcInput.value = node.name;
+    setSourcePin(node); flash(srcInput, '#00e676');
+  }
+});
 
-      var srcNode = ALL_NODES.find(function(n) { return n.id === sourceId; });
-      var dstNode = ALL_NODES.find(function(n) { return n.id === destId;   });
+function flash(el, color) {
+  el.style.borderColor = color;
+  setTimeout(function() { el.style.borderColor = ''; }, 1500);
+}
+</script>
+<script>
+// ── ROUTE CALCULATION ─────────────────────────────────────────────────
+function calculateRoute() {
+  var sourceId = document.getElementById('sourceId').value.trim();
+  var destId   = document.getElementById('destId').value.trim();
+  if (!sourceId) { alert('Please set a start point.'); return; }
+  if (!destId)   { alert('Please set a destination.'); return; }
+  if (sourceId === destId) { alert('Start and destination must be different.'); return; }
 
-      hideLoading();
-      drawRouteOnMap(result);
-      showRoutePanel(result, srcNode, dstNode);
-    }
+  showLoading('CALCULATING SAFE ROUTE…');
 
-    // ── DRAW ROUTE ────────────────────────────────────────────────────
-    function drawRouteOnMap(data) {
-      routeLayer.clearLayers();
-
-      // Orange dashed — shortest/normal route (drawn first, underneath)
-      if (data.normalRoute && data.normalRoute.polyline && data.normalRoute.polyline.length) {
-        L.polyline(data.normalRoute.polyline, {
-          color: '#ff9800', weight: 12, opacity: 0.12
-        }).addTo(routeLayer);
-        L.polyline(data.normalRoute.polyline, {
-          color: '#ff9800', weight: 5, opacity: 0.85, dashArray: '10 6'
-        }).bindPopup('<b style="color:#ff9800">⚠ Shortest Route</b><br/>May pass through flooded roads')
-          .addTo(routeLayer);
-      }
-
-      // Blue solid — safe route (drawn on top)
-      if (data.safeRoute && data.safeRoute.polyline && data.safeRoute.polyline.length) {
-        L.polyline(data.safeRoute.polyline, {
-          color: '#1565C0', weight: 18, opacity: 0.18
-        }).addTo(routeLayer);
-        L.polyline(data.safeRoute.polyline, {
-          color: '#1976D2', weight: 6, opacity: 1
-        }).bindPopup('<b style="color:#42A5F5">✅ Safe Route</b><br/>Avoids all flooded roads')
-          .addTo(routeLayer);
-      }
-
-      // Fit map to the safe route (or normal if no safe)
-      var fitData = data.safeRoute || data.normalRoute;
-      if (fitData && fitData.polyline && fitData.polyline.length) {
-        map.fitBounds(L.latLngBounds(fitData.polyline), { padding: [60, 60] });
-      }
-    }
-
-    // ── ROUTE RESULT PANEL ────────────────────────────────────────────
-    function showRoutePanel(data, srcNode, dstNode) {
-      var panel   = document.getElementById('routeResult');
-      var content = document.getElementById('routeResultContent');
-
-      var srcName = srcNode ? srcNode.name : 'Source';
-      var dstName = dstNode ? dstNode.name : 'Destination';
-
-      var html = '<div style="font-weight:800;font-size:13px;margin-bottom:12px;color:#e8edf5;line-height:1.5">'
-        + srcName
-        + '<br/><span style="color:#8899bb;font-size:11px">↓ to</span><br/>'
-        + dstName
-        + '</div>';
-
-      if (data.safeRoute) {
-        var r    = data.safeRoute;
-        var note = r.hasYellow
-          ? '<span style="color:#ffe600;font-size:10px">⚠ Passes waterlogged roads — drive carefully</span>'
-          : '<span style="color:#00e676;font-size:10px">✅ Fully safe — no water on route</span>';
-
-        var roadRows = r.pathRoads.map(function(rd) {
-          var c = STATUS_CFG[rd.status] ? STATUS_CFG[rd.status].color : '#888';
-          return '<div style="display:flex;align-items:center;gap:6px;font-family:\'Space Mono\',monospace;font-size:10px;color:#8899bb;margin-bottom:2px">'
-            + '<div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + c + '"></div>'
-            + '<span style="flex:1">' + rd.name + '</span>'
-            + '<span style="color:' + c + ';text-transform:uppercase">' + rd.status + '</span>'
-            + '</div>';
-        }).join('');
-
-        html += '<div style="margin-bottom:14px">'
-          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
-          + '<span style="background:rgba(25,118,210,0.15);color:#42A5F5;border:1px solid #1976D2;border-radius:20px;font-family:\'Space Mono\',monospace;font-size:10px;padding:2px 8px;font-weight:700">✅ SAFE ROUTE</span>'
-          + '<span style="font-family:\'Space Mono\',monospace;font-size:11px;color:#8899bb">' + r.totalDistance + ' km</span>'
-          + '</div>'
-          + note
-          + '<div style="margin-top:8px">' + roadRows + '</div>'
-          + '</div>'
-          + '<div class="result-divider"></div>';
-      } else {
-        html += '<div class="no-route-msg">⚠️ No flood-safe route found. All paths are blocked.</div>'
-          + '<div class="result-divider"></div>';
-      }
-
-      if (data.normalRoute) {
-        var nr = data.normalRoute;
-        html += '<div style="margin-bottom:14px">'
-          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
-          + '<span style="background:rgba(255,152,0,0.15);color:#ff9800;border:1px solid #ff9800;border-radius:20px;font-family:\'Space Mono\',monospace;font-size:10px;padding:2px 8px;font-weight:700">⚠ SHORTEST ROUTE</span>'
-          + '<span style="font-family:\'Space Mono\',monospace;font-size:11px;color:#8899bb">' + nr.totalDistance + ' km</span>'
-          + '</div>'
-          + '<span style="color:#ff9800;font-size:10px;font-family:\'Space Mono\',monospace">May pass through flooded roads</span>'
-          + '</div>';
-      }
-
-      if (data.safeRoute && data.normalRoute) {
-        var diff = Math.round((data.safeRoute.totalDistance - data.normalRoute.totalDistance) * 10) / 10;
-        html += '<div class="result-divider"></div>'
-          + '<div class="result-summary">'
-          + 'Safe route is <span>' + (diff >= 0 ? '+' : '') + diff + ' km</span> vs shortest.<br/>'
-          + '<span style="color:#00e676">Recommendation: Take the safe route.</span>'
-          + '</div>';
-      }
-
-      content.innerHTML = html;
-      panel.classList.remove('hidden');
-    }
-
-    function closeResult() {
-      document.getElementById('routeResult').classList.add('hidden');
-    }
-
-    // ── CLEAR ALL ─────────────────────────────────────────────────────
-    function clearAll() {
-      routeLayer.clearLayers();
-      clearPins();
-      closeResult();
-      document.getElementById('srcInput').value = '';
-      document.getElementById('dstInput').value = '';
-      document.getElementById('sourceId').value = '';
-      document.getElementById('destId').value   = '';
-    }
-
-    function swapLocations() {
-      var srcInput = document.getElementById('srcInput');
-      var dstInput = document.getElementById('dstInput');
-      var srcId    = document.getElementById('sourceId');
-      var dstId    = document.getElementById('destId');
-
-      var tmpText = srcInput.value;
-      var tmpId   = srcId.value;
-      srcInput.value = dstInput.value;
-      srcId.value    = dstId.value;
-      dstInput.value = tmpText;
-      dstId.value    = tmpId;
-
-      var tmpPin = srcPin;
-      srcPin = dstPin;
-      dstPin = tmpPin;
-      if (srcPin) srcPin.setIcon(makePinIcon('#00e676'));
-      if (dstPin) dstPin.setIcon(makePinIcon('#ff3b3b'));
-    }
-
-    // ── LOADING ───────────────────────────────────────────────────────
-    function showLoading(t) {
-      document.getElementById('loadingText').textContent = t || 'LOADING…';
-      document.getElementById('mapLoading').classList.add('active');
-    }
-    function hideLoading() {
-      document.getElementById('mapLoading').classList.remove('active');
-    }
-
-    // ── INIT ──────────────────────────────────────────────────────────
-    showLoading('LOADING ROAD NETWORK…');
-    drawAllRoads();
-    loadStats();
+  // setTimeout so loading spinner renders before heavy computation
+  setTimeout(function() {
+    var result  = getRoutes(ALL_NODES, ALL_ROADS, sourceId, destId);
+    var srcNode = ALL_NODES.find(function(n) { return n.id === sourceId; });
+    var dstNode = ALL_NODES.find(function(n) { return n.id === destId;   });
     hideLoading();
-  </script>
+    drawRouteOnMap(result);
+    showRoutePanel(result, srcNode, dstNode);
+  }, 30);
+}
+
+// ── DRAW ROUTE ────────────────────────────────────────────────────────
+function drawRouteOnMap(data) {
+  routeLayer.clearLayers();
+
+  if (data.normalRoute && data.normalRoute.polyline && data.normalRoute.polyline.length) {
+    L.polyline(data.normalRoute.polyline, { color:'#ff9800', weight:12, opacity:.12 }).addTo(routeLayer);
+    L.polyline(data.normalRoute.polyline, { color:'#ff9800', weight:5, opacity:.85, dashArray:'10 6' })
+      .bindPopup('<b style="color:#ff9800">⚠ Shortest Route</b><br/>May pass flooded roads')
+      .addTo(routeLayer);
+  }
+
+  if (data.safeRoute && data.safeRoute.polyline && data.safeRoute.polyline.length) {
+    L.polyline(data.safeRoute.polyline, { color:'#1565C0', weight:18, opacity:.18 }).addTo(routeLayer);
+    L.polyline(data.safeRoute.polyline, { color:'#1976D2', weight:6, opacity:1 })
+      .bindPopup('<b style="color:#42A5F5">✅ Safe Route</b><br/>Avoids all flooded roads')
+      .addTo(routeLayer);
+  }
+
+  var fit = data.safeRoute || data.normalRoute;
+  if (fit && fit.polyline && fit.polyline.length) {
+    map.fitBounds(L.latLngBounds(fit.polyline), { padding:[60,60] });
+  }
+}
+
+// ── ROUTE RESULT PANEL ────────────────────────────────────────────────
+function showRoutePanel(data, srcNode, dstNode) {
+  var panel   = document.getElementById('routeResult');
+  var content = document.getElementById('routeResultContent');
+
+  var html = '<div style="font-weight:800;font-size:13px;margin-bottom:12px;color:#e8edf5;line-height:1.5">'
+    + (srcNode ? srcNode.name : 'Source')
+    + '<br/><span style="color:#8899bb;font-size:11px">↓ to</span><br/>'
+    + (dstNode ? dstNode.name : 'Destination') + '</div>';
+
+  if (data.safeRoute) {
+    var r    = data.safeRoute;
+    var note = r.hasYellow
+      ? '<span style="color:#ffe600;font-size:10px">⚠ Passes waterlogged roads — drive carefully</span>'
+      : '<span style="color:#00e676;font-size:10px">✅ Fully safe — no water on route</span>';
+    var rows = r.pathRoads.map(function(rd) {
+      var c = STATUS_CFG[rd.status] ? STATUS_CFG[rd.status].color : '#888';
+      return '<div style="display:flex;align-items:center;gap:6px;font-family:\'Space Mono\',monospace;font-size:10px;color:#8899bb;margin-bottom:2px">'
+        + '<div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + c + '"></div>'
+        + '<span style="flex:1">' + rd.name + '</span>'
+        + '<span style="color:' + c + ';text-transform:uppercase">' + rd.status + '</span></div>';
+    }).join('');
+
+    html += '<div style="margin-bottom:12px">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+      + '<span style="background:rgba(25,118,210,.15);color:#42A5F5;border:1px solid #1976D2;border-radius:20px;font-family:\'Space Mono\',monospace;font-size:10px;padding:2px 8px;font-weight:700">✅ SAFE ROUTE</span>'
+      + '<span style="font-family:\'Space Mono\',monospace;font-size:11px;color:#8899bb">' + r.totalDistance + ' km</span></div>'
+      + note + '<div style="margin-top:8px">' + rows + '</div></div>'
+      + '<div class="result-divider"></div>';
+  } else {
+    html += '<div class="no-route-msg">⚠️ No flood-safe route found. All paths blocked.</div><div class="result-divider"></div>';
+  }
+
+  if (data.normalRoute) {
+    var nr = data.normalRoute;
+    html += '<div style="margin-bottom:10px">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+      + '<span style="background:rgba(255,152,0,.15);color:#ff9800;border:1px solid #ff9800;border-radius:20px;font-family:\'Space Mono\',monospace;font-size:10px;padding:2px 8px;font-weight:700">⚠ SHORTEST</span>'
+      + '<span style="font-family:\'Space Mono\',monospace;font-size:11px;color:#8899bb">' + nr.totalDistance + ' km</span></div>'
+      + '<span style="color:#ff9800;font-size:10px;font-family:\'Space Mono\',monospace">May pass flooded roads</span></div>';
+  }
+
+  if (data.safeRoute && data.normalRoute) {
+    var diff = Math.round((data.safeRoute.totalDistance - data.normalRoute.totalDistance) * 10) / 10;
+    html += '<div class="result-divider"></div><div class="result-summary">'
+      + 'Safe route is <span>' + (diff >= 0 ? '+' : '') + diff + ' km</span> vs shortest.<br/>'
+      + '<span style="color:#00e676">Take the safe route.</span></div>';
+  }
+
+  content.innerHTML = html;
+  panel.classList.remove('hidden');
+}
+
+function closeResult() { document.getElementById('routeResult').classList.add('hidden'); }
+
+// ── CLEAR ALL ─────────────────────────────────────────────────────────
+function clearAll() {
+  routeLayer.clearLayers();
+  clearPins();
+  closeResult();
+  document.getElementById('srcInput').value  = '';
+  document.getElementById('dstInput').value  = '';
+  document.getElementById('sourceId').value  = '';
+  document.getElementById('destId').value    = '';
+}
+
+function swapLocations() {
+  var si = document.getElementById('srcInput'),  di = document.getElementById('dstInput');
+  var sv = document.getElementById('sourceId'),  dv = document.getElementById('destId');
+  var t1 = si.value, t2 = sv.value;
+  si.value = di.value; sv.value = dv.value;
+  di.value = t1;       dv.value = t2;
+  var tp = srcPin; srcPin = dstPin; dstPin = tp;
+  if (srcPin) srcPin.setIcon(makePinIcon('#00e676'));
+  if (dstPin) dstPin.setIcon(makePinIcon('#ff3b3b'));
+}
+
+// ── LOADING ───────────────────────────────────────────────────────────
+function showLoading(t) {
+  document.getElementById('loadingText').textContent = t || 'LOADING…';
+  document.getElementById('mapLoading').classList.add('active');
+}
+function hideLoading() { document.getElementById('mapLoading').classList.remove('active'); }
+
+// ── INIT ──────────────────────────────────────────────────────────────
+showLoading('LOADING KENGERI ROAD NETWORK…');
+drawAllRoads();
+updateStats();
+hideLoading();
+</script>
 </body>
 </html>
