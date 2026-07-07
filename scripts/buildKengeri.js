@@ -112,7 +112,12 @@ appNodes.forEach(node => {
   else                          node.name = unique.slice(0, 2).join(' / ');
 });
 
-// 8. Seeded flood status — 10% red, 20% yellow, 70% green
+// 8. Status assignment:
+// - Core Kengeri area (bbox 12.88-12.93, 77.46-77.55): seeded red/yellow/green
+// - Surrounding/expanded areas: status='none' (grey, unmarked — user can mark them)
+function isInKengeriCore(lat, lng) {
+  return lat >= 12.88 && lat <= 12.93 && lng >= 77.46 && lng <= 77.55;
+}
 function seededStatus(seed) {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) & 0xffffffff;
@@ -135,7 +140,9 @@ segments.forEach(s => {
     from:     fromId,
     to:       toId,
     distance: s.distance,
-    status:   seededStatus(s.name + s.fromOsmId),
+    status:   isInKengeriCore(s.coords[0][0], s.coords[0][1])
+                ? seededStatus(s.name + s.fromOsmId)
+                : 'none',
     coords:   s.coords
   });
 });
@@ -144,7 +151,8 @@ console.log('App nodes:', appNodes.length, '| App roads:', appRoads.length);
 const red    = appRoads.filter(r => r.status === 'red').length;
 const yellow = appRoads.filter(r => r.status === 'yellow').length;
 const green  = appRoads.filter(r => r.status === 'green').length;
-console.log('Red:', red, '| Yellow:', yellow, '| Green:', green);
+const none   = appRoads.filter(r => r.status === 'none').length;
+console.log('Red:', red, '| Yellow:', yellow, '| Green:', green, '| Unmarked:', none);
 
 // Map center
 const lats = appNodes.map(n => n.lat);

@@ -79,6 +79,7 @@ html,body{height:100%;background:var(--bg-dark);color:var(--text-primary);font-f
 .filter-tab.active-yellow{background:rgba(255,230,0,.15);border-color:#ffe600;color:#ffe600;}
 .filter-tab.active-green{background:rgba(0,230,118,.15);border-color:#00e676;color:#00e676;}
 .filter-tab.active-all{background:rgba(0,188,212,.15);border-color:#00bcd4;color:#00bcd4;}
+.filter-tab.active-none{background:rgba(68,85,119,.2);border-color:#445577;color:#7a8faa;}
 .map-container{flex:1;position:relative;overflow:hidden;}
 #map{width:100%;height:100%;background:var(--bg-dark);}
 .map-loading{position:absolute;inset:0;background:rgba(10,14,26,.85);display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:50;backdrop-filter:blur(4px);}
@@ -170,6 +171,7 @@ html,body{height:100%;background:var(--bg-dark);color:var(--text-primary);font-f
         <div class="legend-item"><div class="legend-dot" style="background:#00e676;box-shadow:0 0 5px #00e676"></div><span><b style="color:#00e676">GREEN</b> — Safe, no water</span></div>
         <div class="legend-item" style="margin-top:4px"><div class="legend-dot" style="background:#1976D2"></div><span><b style="color:#42A5F5">BLUE</b> — Safe route</span></div>
         <div class="legend-item"><div class="legend-dot" style="background:#ff9800"></div><span><b style="color:#ff9800">ORANGE</b> — Shortest route</span></div>
+        <div class="legend-item" style="margin-top:4px"><div class="legend-dot" style="background:#445577"></div><span><b style="color:#7a8faa">GREY</b> — Unmarked (click to set)</span></div>
       </div>
     </div>
 
@@ -180,7 +182,11 @@ html,body{height:100%;background:var(--bg-dark);color:var(--text-primary);font-f
         <div class="stat-box"><div class="stat-number danger" id="statRed">—</div><div class="stat-label">🔴 Flooded</div></div>
         <div class="stat-box"><div class="stat-number warn"   id="statYellow">—</div><div class="stat-label">🟡 Caution</div></div>
         <div class="stat-box"><div class="stat-number safe-c" id="statGreen">—</div><div class="stat-label">🟢 Safe</div></div>
-        <div class="stat-box"><div class="stat-number info"   id="statTotal">—</div><div class="stat-label">Total</div></div>
+        <div class="stat-box"><div class="stat-number info"   id="statTotal">—</div><div class="stat-label">Total Roads</div></div>
+        <div class="stat-box" style="grid-column:1/-1">
+          <div class="stat-number" style="color:#445577;font-size:16px" id="statNone">—</div>
+          <div class="stat-label">⬜ Unmarked — surrounding areas</div>
+        </div>
       </div>
     </div>
 
@@ -192,6 +198,10 @@ html,body{height:100%;background:var(--bg-dark);color:var(--text-primary);font-f
         <div class="filter-tab"            id="tab-red"    onclick="filterRoads('red')">🔴</div>
         <div class="filter-tab"            id="tab-yellow" onclick="filterRoads('yellow')">🟡</div>
         <div class="filter-tab"            id="tab-green"  onclick="filterRoads('green')">🟢</div>
+        <div class="filter-tab"            id="tab-none"   onclick="filterRoads('none')" style="color:#445577;border-color:#253560">⬜</div>
+      </div>
+      <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text-muted);margin-top:8px">
+        ⬜ = Unmarked roads in surrounding areas. Click them to set status.
       </div>
     </div>
 
@@ -212,7 +222,7 @@ html,body{height:100%;background:var(--bg-dark);color:var(--text-primary);font-f
 <script src="dijkstra.js"></script>
 <script>
 // ── MAP ──────────────────────────────────────────────────────────────
-var map = L.map('map', { center: [12.90961, 77.50747], zoom: 14 });
+var map = L.map('map', { center: [12.91250, 77.52800], zoom: 13 });
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   maxZoom: 19
@@ -226,7 +236,8 @@ var pinLayer   = L.layerGroup().addTo(map);
 var STATUS_CFG = {
   red:    { color: '#ff3b3b', weight: 4, dash: '7 4',  label: '🔴 Flooded — Impassable'    },
   yellow: { color: '#ffe600', weight: 4, dash: '10 4', label: '🟡 Waterlogged — Drive Slow' },
-  green:  { color: '#00e676', weight: 3, dash: null,   label: '🟢 Safe — No Water'          }
+  green:  { color: '#00e676', weight: 3, dash: null,   label: '🟢 Safe — No Water'          },
+  none:   { color: '#445577', weight: 2, dash: null,   label: '⬜ Unmarked — Click to set'  }
 };
 
 // ── ORIGINAL STATUS (for reset) ───────────────────────────────────────
@@ -237,10 +248,13 @@ ALL_ROADS.forEach(function(r) { originalStatus[r.id] = r.status; });
 var roadPolylines = {};
 
 function makePopupHTML(road) {
-  var cfg = STATUS_CFG[road.status] || STATUS_CFG['green'];
+  var cfg = STATUS_CFG[road.status] || STATUS_CFG['none'];
+  var statusLine = road.status === 'none'
+    ? '<span style="color:#445577;font-size:11px">⬜ Unmarked — set a status below</span>'
+    : '<span style="color:' + cfg.color + ';font-size:11px;font-weight:700">' + cfg.label + '</span>';
   return '<div style="font-family:sans-serif;padding:10px 12px;min-width:210px">'
     + '<b style="font-size:13px">' + road.name + '</b><br/>'
-    + '<span style="color:' + cfg.color + ';font-size:11px;font-weight:700">' + cfg.label + '</span><br/>'
+    + statusLine + '<br/>'
     + '<span style="font-size:10px;color:#888">' + road.distance + ' km · ' + road.highway + '</span>'
     + '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">'
     + '<button class="road-popup-btn" style="background:#ff3b3b;color:#fff" onclick="setRoadStatus(\'' + road.id + '\',\'red\')">🔴 Flood</button>'
@@ -294,17 +308,20 @@ function updateStats() {
   var red    = ALL_ROADS.filter(function(r) { return r.status === 'red';    }).length;
   var yellow = ALL_ROADS.filter(function(r) { return r.status === 'yellow'; }).length;
   var green  = ALL_ROADS.filter(function(r) { return r.status === 'green';  }).length;
+  var none   = ALL_ROADS.filter(function(r) { return r.status === 'none';   }).length;
   document.getElementById('statRed').textContent    = red;
   document.getElementById('statYellow').textContent = yellow;
   document.getElementById('statGreen').textContent  = green;
   document.getElementById('statTotal').textContent  = ALL_ROADS.length;
+  var noneEl = document.getElementById('statNone');
+  if (noneEl) noneEl.textContent = none;
 }
 
 // ── FILTER ────────────────────────────────────────────────────────────
 function filterRoads(filter) {
-  ['all','red','yellow','green'].forEach(function(f) {
+  ['all','red','yellow','green','none'].forEach(function(f) {
     var el = document.getElementById('tab-' + f);
-    el.className = 'filter-tab' + (f === filter ? ' active-' + f : '');
+    if (el) el.className = 'filter-tab' + (f === filter ? ' active-' + f : '');
   });
   Object.keys(roadPolylines).forEach(function(id) {
     var entry = roadPolylines[id];
